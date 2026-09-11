@@ -3,6 +3,12 @@
 Stamp a society's GPS coordinates into the EXIF metadata of a batch of photos.
 Runs entirely in your browser — **no photo is ever uploaded anywhere.**
 
+**Live:** <https://saranshkhera-openhouse.github.io/geo-dude/>
+
+Because every photo is processed in the visitor's own browser, hosting this
+publicly costs nothing and exposes no one's photos — nothing is ever sent to
+a server. Sharing the link is enough; there is no account or install.
+
 ## Run it
 
 The page reads `coords.json` with `fetch`, which browsers block on `file://`.
