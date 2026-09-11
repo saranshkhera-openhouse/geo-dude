@@ -21,9 +21,21 @@ let busy = false;
 
 const drop = $('drop'), fileInput = $('file'), grid = $('grid');
 
-async function addFiles(fileList) {
+let addQueue = Promise.resolve();
+
+/* Picks are serialised: a second pick arriving while the first is still
+   decoding thumbnails would otherwise interleave, and the slower one would
+   overwrite the other's status note. */
+function addFiles(fileList) {
   const incoming = Array.from(fileList);
-  if (!incoming.length) return;
+  if (!incoming.length) return addQueue;
+  addQueue = addQueue.then(() => addFilesNow(incoming)).catch((err) => {
+    console.error('geo-dude: adding files failed', err);
+  });
+  return addQueue;
+}
+
+async function addFilesNow(incoming) {
 
   let added = 0, dupes = 0;
   const rejected = [];

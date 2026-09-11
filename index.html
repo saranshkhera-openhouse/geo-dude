@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>geo-dude &mdash; add GPS location to property photos for 99acres listings</title>
-<meta name="description" content="99acres won&rsquo;t accept listing photos without GPS location data. Drop your photos in, pick the society, and download them with the right coordinates built in. Free, works in your browser, nothing is uploaded.">
+<meta name="description" content="99acres won&rsquo;t accept listing photos without GPS location data. Pick your society from 1,150 across Gurgaon, Noida and Ghaziabad, and download your photos with the right coordinates built in. Free, runs in your browser, nothing is uploaded.">
 <link rel="canonical" href="https://saranshkhera-openhouse.github.io/geo-dude/">
 <meta name="robots" content="index,follow">
 
@@ -30,7 +30,7 @@
       "url": "https://saranshkhera-openhouse.github.io/geo-dude/",
       "applicationCategory": "MultimediaApplication",
       "operatingSystem": "Any browser",
-      "description": "Add GPS location coordinates to property listing photos so they pass the photo requirements on 99acres. Converts HEIC and PNG to JPEG and compresses each photo under 2.5 MB. Runs entirely in the browser; no photo is uploaded.",
+      "description": "Add GPS location coordinates to property listing photos so they pass the photo requirements on 99acres. Covers 1,150 housing societies across Gurgaon, Noida and Ghaziabad. Converts HEIC and PNG to JPEG and compresses each photo under 2.5 MB. Runs entirely in the browser; no photo is uploaded.",
       "offers": { "@type": "Offer", "price": "0", "priceCurrency": "INR" }
     },
     {
@@ -63,28 +63,42 @@
 </script>
 </head>
 <body>
-<header>
-  <p class="wordmark">geo&#8209;dude</p>
+<nav class="topbar">
+  <a class="wordmark" href="#top">geo&#8209;dude</a>
+  <div class="topnav">
+    <a href="#how">How it works</a>
+    <a href="#faq">Questions</a>
+    <a href="https://github.com/saranshkhera-openhouse/geo-dude">GitHub</a>
+  </div>
+</nav>
 
-  <h1>Your listing photos are missing their location.</h1>
+<header id="top">
+  <div class="hero-copy">
+    <h1>Your listing photos are missing their location.</h1>
 
-  <p class="sub">99acres won&rsquo;t publish property photos that don&rsquo;t carry GPS
-  coordinates &mdash; the ones your camera records when location is switched on, and
-  quietly drops when it isn&rsquo;t, or when a photo has been shared over WhatsApp.
-  This puts them back.</p>
+    <p class="sub">99acres won&rsquo;t publish property photos that don&rsquo;t carry
+    GPS coordinates &mdash; the ones your camera records when location is switched
+    on, and quietly drops when it isn&rsquo;t, or when a photo has been shared over
+    WhatsApp. This puts them back.</p>
 
-  <p class="sub">Drop in your photos, pick the society, and download them ready to
-  upload. Takes a few seconds for a whole batch. It&rsquo;s free, and your photos
-  never leave your phone or laptop.</p>
+    <ul class="facts">
+      <li><strong>1,150 societies</strong> across Gurgaon, Noida and Ghaziabad</li>
+      <li><strong>iPhone photos work</strong> &mdash; HEIC is converted for you</li>
+      <li><strong>Under 2.5&nbsp;MB each</strong>, so uploads don&rsquo;t get rejected</li>
+      <li><strong>Nothing is uploaded</strong> &mdash; it all runs on your device</li>
+    </ul>
 
-  <ul class="facts">
-    <li><strong>1,150 societies</strong> in Gurgaon, already mapped</li>
-    <li><strong>iPhone photos work</strong> &mdash; HEIC is converted for you</li>
-    <li><strong>Under 2.5&nbsp;MB each</strong>, so uploads don&rsquo;t get rejected</li>
-  </ul>
+    <a href="#tool" class="cta">Tag my photos</a>
+  </div>
+
+  <figure class="mapwrap">
+    <svg id="map" hidden aria-hidden="true"></svg>
+    <figcaption>Every society in the list, plotted to scale.</figcaption>
+  </figure>
 </header>
 
-<main>
+<div class="shell">
+<main id="tool">
   <!-- STEP 1 : photos -->
   <section class="step" aria-labelledby="s1">
     <h2 id="s1"><span class="num">1</span> Choose photos</h2>
@@ -141,8 +155,21 @@
     <p id="goNote" class="note" role="status" aria-live="polite">Pick at least one photo and a society first.</p>
     <ul id="fails" class="fails" hidden></ul>
   </section>
+
+  <aside class="assure">
+    <h2>What happens to your photos</h2>
+    <ol class="flow">
+      <li><span>Read</span> from your device, into this tab only</li>
+      <li><span>Converted</span> to JPEG if needed, and resized</li>
+      <li><span>Stamped</span> with the society&rsquo;s coordinates</li>
+      <li><span>Saved</span> straight back to your downloads</li>
+    </ol>
+    <p class="assure-note">No server, no account, no copy kept. Close the tab and
+    nothing remains.</p>
+  </aside>
 </main>
 
+<div class="sidecol">
 <section class="prose" aria-labelledby="how">
   <h2 id="how">How to use it</h2>
   <ol class="howto">
@@ -183,7 +210,8 @@
       screen &mdash; and saved at the best quality that fits the size limit.</dd>
 
     <dt>My society isn&rsquo;t in the list.</dt>
-    <dd>The list covers 1,150 societies in Gurgaon. If yours is missing, you can add
+    <dd>The list covers 1,150 societies across Gurgaon, Noida and Ghaziabad. If yours
+      is missing, you can add
       it to <code>coords.json</code> in the repository, or
       <a href="https://github.com/saranshkhera-openhouse/geo-dude/issues">open an
       issue</a> and it can be added.</dd>
@@ -193,6 +221,8 @@
       the society, not the precise spot each photo was taken.</dd>
   </dl>
 </section>
+</div><!-- /sidecol -->
+</div><!-- /shell -->
 
 <footer class="foot">
   <p><a href="https://github.com/saranshkhera-openhouse/geo-dude">View the source on
@@ -203,6 +233,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="map.js"></script>
 <script src="image.js"></script>
 <script src="app.js"></script>
 </body>

@@ -2,6 +2,8 @@
 
 **Add GPS location to property photos so 99acres will accept them.**
 
+Covers 1,150 housing societies across Gurgaon, Noida and Ghaziabad.
+
 👉 **[Use it here](https://saranshkhera-openhouse.github.io/geo-dude/)** — free, no
 sign-up, nothing to install.
 
@@ -20,8 +22,8 @@ refuses.
 
 ## What this does
 
-Drop the photos in, pick the society from a list of 1,150 in Gurgaon, and
-download them with the right coordinates written in. A whole batch takes a few
+Drop the photos in, pick the society from a list of 1,150 across Gurgaon,
+Noida and Ghaziabad, and download them with the right coordinates written in. A whole batch takes a few
 seconds.
 
 It also handles the two other things that trip up a listing upload:
@@ -113,6 +115,7 @@ on the map at the right society.
 
 ## Notes
 
+- Covers 1,150 societies across Gurgaon, Noida and Ghaziabad.
 - Every photo in a batch gets the same coordinates — the society's centre point,
   not the precise spot each photo was taken.
 - Transparent PNG areas are flattened onto white, since JPEG has no alpha.
