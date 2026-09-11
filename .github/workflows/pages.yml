@@ -24,6 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        with:
+          # Enable Pages on first run so a fresh clone of this repo deploys
+          # without anyone having to flip the setting by hand first.
+          enablement: true
       # The app is plain static files — no build step, publish the repo root.
       - uses: actions/upload-pages-artifact@v3
         with:
