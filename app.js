@@ -1,123 +1,111 @@
-/* geo-dude — stamp society GPS coords into JPEG EXIF, entirely client-side. */
+/* geo-dude — UI and state. Image work lives in image.js (window.GeoImage). */
 'use strict';
 
-/* ---------- GPS / EXIF ---------------------------------------------------- */
-
-/* Decimal degrees -> EXIF rational DMS, e.g. 28.502937 ->
-   [[28,1],[30,1],[105493,10000]]. Seconds keep 4 decimal places (~0.003 m). */
-function toDMS(deg) {
-  const abs = Math.abs(deg);
-  const d = Math.floor(abs);
-  const minFloat = (abs - d) * 60;
-  const m = Math.floor(minFloat);
-  const sec = (minFloat - m) * 60;
-  return [[d, 1], [m, 1], [Math.round(sec * 10000), 10000]];
-}
-
-/* Return a new JPEG data-URL with GPS tags set to lat/lng.
-   All non-GPS metadata in the original is preserved. */
-function stampGps(dataUrl, lat, lng) {
-  let exif;
-  try {
-    exif = piexif.load(dataUrl);
-  } catch (e) {
-    // No/!unreadable EXIF — start a fresh, otherwise-empty structure.
-    exif = { '0th': {}, Exif: {}, GPS: {}, Interop: {}, '1st': {}, thumbnail: null };
-  }
-  exif.GPS = exif.GPS || {};
-  const G = piexif.GPSIFD;
-  exif.GPS[G.GPSVersionID]    = [2, 3, 0, 0];
-  exif.GPS[G.GPSLatitudeRef]  = lat >= 0 ? 'N' : 'S';
-  exif.GPS[G.GPSLatitude]     = toDMS(lat);
-  exif.GPS[G.GPSLongitudeRef] = lng >= 0 ? 'E' : 'W';
-  exif.GPS[G.GPSLongitude]    = toDMS(lng);
-  exif.GPS[G.GPSMapDatum]     = 'WGS-84';
-  return piexif.insert(piexif.dump(exif), dataUrl);
-}
-
-/* ---------- small helpers ------------------------------------------------- */
-
+const IMG = window.GeoImage;
 const $ = (id) => document.getElementById(id);
 
-const readAsDataURL = (file) => new Promise((res, rej) => {
-  const r = new FileReader();
-  r.onload  = () => res(r.result);
-  r.onerror = () => rej(r.error || new Error('could not read file'));
-  r.readAsDataURL(file);
-});
+const fmtMB = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB'
+                                  : Math.max(1, Math.round(b / 1024)) + ' KB';
 
-const dataUrlToBytes = (dataUrl) => {
-  const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-};
-
-const isJpeg = (f) => /^image\/jpe?g$/i.test(f.type) || /\.jpe?g$/i.test(f.name);
-
-/* Filesystem-safe zip name, and unique names inside the zip. */
-const safeName = (s) => s.replace(/[\/\\?%*:|"<>]/g, '-').trim() || 'photos';
+/* Let the browser paint before continuing a long loop. */
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
 
 /* ---------- state --------------------------------------------------------- */
 
-const photos = [];        // { key, file, url }
-let societies = [];       // { society_name, latitude, longitude }
-let society = null;       // selected society
+const photos = [];   // { key, file, format, thumb, note }
+let societies = [];
+let society = null;
 let busy = false;
 
 /* ---------- step 1 : photos ---------------------------------------------- */
 
 const drop = $('drop'), fileInput = $('file'), grid = $('grid');
 
-function addFiles(fileList) {
+async function addFiles(fileList) {
   const incoming = Array.from(fileList);
-  const skipped = [];
+  if (!incoming.length) return;
+
   let added = 0, dupes = 0;
+  const rejected = [];
+
+  setNote($('pickNote'), `Reading ${incoming.length} file${incoming.length === 1 ? '' : 's'}…`);
 
   for (const file of incoming) {
-    if (!isJpeg(file)) { skipped.push(file.name); continue; }
     const key = `${file.name}|${file.size}|${file.lastModified}`;
     if (photos.some((p) => p.key === key)) { dupes++; continue; }
-    photos.push({ key, file, url: URL.createObjectURL(file) });
+
+    const format = await IMG.sniffFormat(file);
+    if (format === 'gif' || format === 'unknown' || format === 'avif') {
+      rejected.push(file.name);
+      continue;
+    }
+    const entry = { key, file, format, thumb: null, note: null };
+    photos.push(entry);
     added++;
+    renderGrid();                 // show the tile immediately
+    await nextFrame();            // …then decode its preview without blocking
+    entry.thumb = await IMG.makeThumb(file, format);
+    renderGrid();
   }
 
   const bits = [];
-  if (added)  bits.push(`Added ${added} photo${added === 1 ? '' : 's'}.`);
-  if (dupes)  bits.push(`${dupes} already in the list.`);
-  if (skipped.length) {
-    bits.push(`Skipped ${skipped.length} non-JPEG file${skipped.length === 1 ? '' : 's'} ` +
-              `(${skipped.slice(0, 3).join(', ')}${skipped.length > 3 ? '…' : ''}) — ` +
-              `only JPEG can carry GPS metadata.`);
+  if (added) bits.push(`Added ${added} photo${added === 1 ? '' : 's'}.`);
+  if (dupes) bits.push(`${dupes} already in the list.`);
+  if (rejected.length) {
+    bits.push(`Can't use ${rejected.length} file${rejected.length === 1 ? '' : 's'} ` +
+              `(${rejected.slice(0, 3).join(', ')}${rejected.length > 3 ? '…' : ''}) — ` +
+              `JPEG, HEIC, PNG and WebP only.`);
   }
-  setNote($('pickNote'), bits.join(' '), skipped.length ? 'warn' : '');
+  setNote($('pickNote'), bits.join(' '), rejected.length ? 'warn' : '');
   renderGrid();
 }
+
+const BADGE = { heic: 'HEIC', png: 'PNG', webp: 'WEBP' };
 
 function renderGrid() {
   grid.textContent = '';
   for (const p of photos) {
     const li = document.createElement('li');
-    const img = document.createElement('img');
-    img.src = p.url; img.alt = p.file.name; img.loading = 'lazy';
+    if (p.thumb) {
+      const img = document.createElement('img');
+      img.src = p.thumb; img.alt = p.file.name;
+      li.append(img);
+    } else {
+      li.classList.add('loading');
+    }
+    if (BADGE[p.format]) {
+      const b = document.createElement('span');
+      b.className = 'badge';
+      b.textContent = BADGE[p.format];
+      b.title = `${BADGE[p.format]} — will be converted to JPEG`;
+      li.append(b);
+    }
+    if (p.note) {
+      const n = document.createElement('span');
+      n.className = 'tag-note';
+      n.textContent = p.note;
+      li.append(n);
+    }
     const x = document.createElement('button');
     x.type = 'button'; x.className = 'x'; x.textContent = '×';
-    x.title = `Remove ${p.file.name}`;
     x.setAttribute('aria-label', `Remove ${p.file.name}`);
     x.addEventListener('click', () => removePhoto(p.key));
-    li.append(img, x);
+    li.append(x);
     grid.append(li);
   }
-  $('count').textContent = photos.length;
-  $('countWord').textContent = photos.length === 1 ? 'photo' : 'photos';
-  $('gridHead').hidden = photos.length === 0;
+  const n = photos.length;
+  $('count').textContent = n;
+  $('countWord').textContent = n === 1 ? 'photo' : 'photos';
+  const total = photos.reduce((s, p) => s + p.file.size, 0);
+  $('totalSize').textContent = n ? ` · ${fmtMB(total)}` : '';
+  $('gridHead').hidden = n === 0;
   refreshGo();
 }
 
 function removePhoto(key) {
   const i = photos.findIndex((p) => p.key === key);
   if (i < 0) return;
-  URL.revokeObjectURL(photos[i].url);
+  if (photos[i].thumb) URL.revokeObjectURL(photos[i].thumb);
   photos.splice(i, 1);
   renderGrid();
 }
@@ -126,9 +114,13 @@ drop.addEventListener('click', () => fileInput.click());
 drop.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
 });
-// Reset value so re-picking the same file still fires change.
-fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
-
+fileInput.addEventListener('change', () => {
+  // fileInput.files is a LIVE FileList — copy it before clearing the input,
+  // or resetting value wipes the very list we are about to read.
+  const picked = Array.from(fileInput.files);
+  fileInput.value = '';        // reset so re-picking the same file re-fires
+  addFiles(picked);
+});
 ['dragenter', 'dragover'].forEach((ev) =>
   drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave', 'drop'].forEach((ev) =>
@@ -137,9 +129,8 @@ drop.addEventListener('drop', (e) => {
   e.preventDefault();
   if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files);
 });
-
 $('clear').addEventListener('click', () => {
-  photos.forEach((p) => URL.revokeObjectURL(p.url));
+  photos.forEach((p) => p.thumb && URL.revokeObjectURL(p.thumb));
   photos.length = 0;
   setNote($('pickNote'), '');
   renderGrid();
@@ -160,7 +151,7 @@ fetch('coords.json')
   .catch((err) => {
     setNote($('socNote'),
       `Could not load coords.json (${err.message}). This page must be served over http:// — ` +
-      `see the README for the one-line command.`, 'warn');
+      `see the README.`, 'warn');
   });
 
 function closeList() {
@@ -258,18 +249,25 @@ socClear.addEventListener('click', () => {
 
 /* ---------- step 3 : tag & zip ------------------------------------------- */
 
-const go = $('go');
+const go = $('go'), bar = $('bar'), barFill = $('barFill');
 
 function setNote(el, msg, cls) {
   el.textContent = msg;
   el.className = 'note' + (cls ? ' ' + cls : '');
 }
 
+function progress(done, total, label) {
+  bar.hidden = false;
+  barFill.style.width = `${Math.round((done / total) * 100)}%`;
+  bar.setAttribute('aria-valuenow', String(Math.round((done / total) * 100)));
+  setNote($('goNote'), label);
+}
+
 function refreshGo(keepNote) {
   if (busy) return;
   const ready = photos.length > 0 && society !== null;
   go.disabled = !ready;
-  if (keepNote) return;            // preserve the post-run summary
+  if (keepNote) return;
   if (ready) {
     setNote($('goNote'),
       `Ready: ${photos.length} photo${photos.length === 1 ? '' : 's'} → ${society.society_name}.`);
@@ -288,53 +286,93 @@ go.addEventListener('click', async () => {
   go.disabled = true;
   $('fails').hidden = true;
   $('fails').textContent = '';
+  photos.forEach((p) => { p.note = null; });
 
   const lat = +society.latitude, lng = +society.longitude;
   const zip = new JSZip();
-  const used = new Map();   // de-duplicate names inside the zip
+  const used = new Map();
   const failed = [];
-  let done = 0;
+  let done = 0, inTotal = 0, outTotal = 0;
 
-  for (const p of photos) {
-    setNote($('goNote'), `Tagging ${done + 1} of ${photos.length}…`);
-    // Yield so the note actually paints between files.
-    await new Promise((r) => setTimeout(r, 0));
-    try {
-      const tagged = stampGps(await readAsDataURL(p.file), lat, lng);
-      let name = p.file.name;
-      if (used.has(name)) {
-        const n = used.get(name) + 1;
-        used.set(name, n);
-        const dot = name.lastIndexOf('.');
-        name = dot > 0 ? `${name.slice(0, dot)} (${n})${name.slice(dot)}` : `${name} (${n})`;
-      } else {
-        used.set(name, 1);
+  // Run a few photos concurrently so a decode overlaps the worker encodes.
+  // Results are collected by index, then zipped in the original order.
+  const LANES = Math.max(1, Math.min(IMG.POOL_SIZE || 2, 4));
+  const results = new Array(photos.length);
+  let next = 0, finished = 0;
+
+  const shortName = (n) => n.length > 28 ? n.slice(0, 26) + '…' : n;
+
+  async function lane() {
+    while (next < photos.length) {
+      const i = next++;
+      const p = photos[i];
+      try {
+        const r = await IMG.processPhoto(p.file, lat, lng, (stage) =>
+          progress(finished, photos.length,
+                   `${stage} — ${shortName(p.file.name)}`));
+        results[i] = r;
+        p.note = r.wasConverted ? `→ JPEG ${fmtMB(r.bytes.length)}`
+               : r.wasRecompressed ? fmtMB(r.bytes.length)
+               : 'unchanged';
+      } catch (err) {
+        results[i] = { error: err.message || 'could not be processed' };
+        p.note = 'failed';
       }
-      zip.file(name, dataUrlToBytes(tagged));
-      done++;
-    } catch (err) {
-      // piexif surfaces low-level parser errors; show something readable instead.
-      failed.push(`${p.file.name} — not a readable JPEG, so it was skipped.`);
-      console.error('geo-dude: failed on', p.file.name, err);
+      finished++;
+      progress(finished, photos.length,
+               `Processed ${finished} of ${photos.length}` +
+               (finished < photos.length ? ` — ${shortName(photos[Math.min(next, photos.length - 1)].file.name)}` : ''));
+      renderGrid();
+      await nextFrame();
     }
   }
 
+  progress(0, photos.length, `Processing ${photos.length} photos…`);
+  await nextFrame();
+  await Promise.all(Array.from({ length: LANES }, lane));
+
+  // Zip in the user's original order, not completion order.
+  photos.forEach((p, i) => {
+    const r = results[i];
+    if (!r || r.error) {
+      failed.push(`${p.file.name} — ${r ? r.error : 'could not be processed'}`);
+      return;
+    }
+    let name = r.name;
+    if (used.has(name)) {
+      const k = used.get(name) + 1;
+      used.set(name, k);
+      const dot = name.lastIndexOf('.');
+      name = dot > 0 ? `${name.slice(0, dot)} (${k})${name.slice(dot)}` : `${name} (${k})`;
+    } else {
+      used.set(name, 1);
+    }
+    zip.file(name, r.bytes);
+    inTotal  += r.inBytes;
+    outTotal += r.bytes.length;
+    done++;
+  });
+
   if (!done) {
-    setNote($('goNote'), 'No photos could be tagged. Nothing was downloaded.', 'warn');
+    bar.hidden = true;
+    setNote($('goNote'), 'No photos could be processed. Nothing was downloaded.', 'warn');
   } else {
-    setNote($('goNote'), 'Building ZIP…');
+    progress(done, photos.length, 'Building ZIP…');
+    await nextFrame();
     const blob = await zip.generateAsync({ type: 'blob' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
     a.href = url;
     a.download = `${safeName(society.society_name)}.zip`;
-    document.body.append(a);
-    a.click();
-    a.remove();
+    document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+    bar.hidden = true;
+    const saved = inTotal > outTotal
+      ? ` · ${fmtMB(inTotal)} → ${fmtMB(outTotal)}` : '';
     setNote($('goNote'),
       `Done — ${done} photo${done === 1 ? '' : 's'} tagged at ` +
-      `${lat.toFixed(6)}, ${lng.toFixed(6)} and downloaded.`, 'ok');
+      `${lat.toFixed(6)}, ${lng.toFixed(6)}${saved}.`, 'ok');
   }
 
   if (failed.length) {
@@ -348,5 +386,7 @@ go.addEventListener('click', async () => {
   }
 
   busy = false;
-  refreshGo(true);   // keep the "Done — …" / failure summary on screen
+  refreshGo(true);
 });
+
+const safeName = (s) => s.replace(/[\/\\?%*:|"<>]/g, '-').trim() || 'photos';
