@@ -1,93 +1,106 @@
 # geo-dude
 
-Stamp a society's GPS coordinates into the EXIF metadata of a batch of photos.
-Runs entirely in your browser — **no photo is ever uploaded anywhere.**
+**Add GPS location to property photos so 99acres will accept them.**
 
-**Live:** <https://saranshkhera-openhouse.github.io/geo-dude/>
+👉 **[Use it here](https://saranshkhera-openhouse.github.io/geo-dude/)** — free, no
+sign-up, nothing to install.
 
-Because every photo is processed in the visitor's own browser, hosting this
-publicly costs nothing and exposes no one's photos — nothing is ever sent to
-a server. Sharing the link is enough; there is no account or install.
+---
 
-## Run it
+## The problem
 
-The page reads `coords.json` with `fetch`, which browsers block on `file://`.
-So serve the folder:
+99acres won't publish listing photos that don't carry GPS coordinates. Cameras
+write those coordinates inside the image file when location is switched on — and
+they go missing when it isn't, or when a photo has been forwarded over WhatsApp,
+which strips that data as it compresses the image. Screenshots and downloaded
+photos never had them.
+
+So you end up with a folder of perfectly good flat photos that the listing form
+refuses.
+
+## What this does
+
+Drop the photos in, pick the society from a list of 1,150 in Gurgaon, and
+download them with the right coordinates written in. A whole batch takes a few
+seconds.
+
+It also handles the two other things that trip up a listing upload:
+
+- **iPhone HEIC photos** are converted to JPEG automatically.
+- **Large photos** are compressed under 2.5 MB so the upload doesn't get
+  rejected for size.
+
+**Your photos never leave your device.** There is no server and no account —
+all the work happens inside the browser tab. You can disconnect from the
+internet after the page loads and it still works.
+
+## How to use it
+
+1. **Add your photos** — drag them in, or tap *browse your files* to pick them
+   from your phone's gallery. Picking again adds to the list instead of starting
+   over, and the same photo twice is ignored.
+2. **Find the society** — type a few letters and pick it from the list. The
+   coordinates shown are the ones written into every photo in the batch.
+3. **Download** — you get one ZIP named after the society. Unzip, and upload.
+
+## Run it yourself
+
+It's a handful of static files, so any web server will do:
 
 ```sh
+git clone https://github.com/saranshkhera-openhouse/geo-dude.git
 cd geo-dude
 python3 -m http.server 8080
 ```
 
-Then open <http://localhost:8080>.
+Then open <http://localhost:8080>. (It needs a server rather than opening the
+file directly, because browsers block `fetch` of `coords.json` over `file://`.)
 
-**To use it from your phone** on the same Wi-Fi, find your machine's LAN
-address (`ipconfig getifaddr en0` on macOS) and open
-`http://<that-address>:8080` there.
+To use it from your phone on the same Wi-Fi, find your machine's address with
+`ipconfig getifaddr en0` and open `http://<that-address>:8080` there.
 
-## Use it
+## Adding a society
 
-1. **Choose photos** — drag and drop, or browse. Pick as many times as you like;
-   new photos are added to the list rather than replacing it. Duplicates are
-   ignored. Remove any photo with the ✕ on its thumbnail.
-2. **Choose society** — start typing to search all 1150 societies from
-   `coords.json`. Arrow keys + Enter, or click. The matched lat/long is shown.
-3. **Tag & download** — every photo gets that society's exact coordinates
-   written to its GPS EXIF tags, and they all come back as `<Society Name>.zip`
-   with the original filenames.
+`coords.json` is a flat list — add an entry and open a pull request:
 
-## Input formats
+```json
+{ "society_name": "Your Society Name", "latitude": 28.4595, "longitude": 77.0266 }
+```
 
-**JPEG, HEIC/HEIF, PNG and WebP** are all accepted, and everything is saved as
-JPEG — the only common format that carries EXIF GPS tags. HEIC and PNG files
-are converted automatically and renamed to `.jpg`.
+Or [open an issue](https://github.com/saranshkhera-openhouse/geo-dude/issues)
+with the name and location, and it can be added for you.
 
-Formats are detected by reading magic bytes, not the file extension, because
-iOS often reports a HEIC's MIME type as empty. GIF and AVIF are rejected at
-pick time with a message naming the files.
-
-The HEIC decoder (~1.3 MB) is only downloaded the first time you actually pick
-a HEIC, so JPEG-only batches don't pay for it. HEIC conversion is CPU-heavy —
-expect a second or two per photo on a laptop, longer on a phone. The progress
-bar names the file it's working on.
-
-## Compression
-
-Output photos are capped at **2.5 MB** and **2560 px on the long edge**:
-
-- A photo already under both caps is **passed through untouched** — its pixels
-  and all its other metadata are preserved, and only GPS tags are added.
-- A larger one is resized to 2560 px, then encoded at the highest quality in
-  `0.92 → 0.85 → 0.78 → 0.70 → 0.62 → 0.54` that lands under 2.5 MB.
-
-2560 px stays sharp on any screen while cutting a 12 MP phone photo to roughly
-a fifth of its size. Each thumbnail shows its result, and the summary reports
-the total saving (e.g. `37.2 MB → 7.1 MB`).
-
-To change the caps, edit `MAX_EDGE` and `MAX_BYTES` at the top of
-[`image.js`](image.js).
-
-## Notes
-
-- Existing metadata is preserved on JPEGs — only the GPS tags are added or
-  replaced. Re-tagging an already-tagged photo overwrites its coordinates.
-  A converted HEIC/PNG has no original EXIF to keep, so its output carries the
-  GPS tags alone.
-- Transparent PNG areas are flattened onto white, since JPEG has no alpha.
-- Tags written: `GPSLatitude`, `GPSLatitudeRef`, `GPSLongitude`,
-  `GPSLongitudeRef`, `GPSMapDatum` (WGS-84), `GPSVersionID`.
-- If a single photo fails, it's skipped and named in a warning; the rest are
-  still tagged and downloaded.
-
-## Files
+## How it works
 
 | File | Role |
 |---|---|
-| `index.html` | Markup for the three steps |
-| `app.css` | Styling, light + dark |
-| `image.js` | Image pipeline: format sniffing, HEIC decode, resize, compress, GPS EXIF |
-| `app.js` | UI and state only |
-| `coords.json` | The 1150 societies and their coordinates |
+| `index.html` | The page: three steps, instructions, FAQ |
+| `app.css` | Styling, light and dark |
+| `image.js` | Format detection, HEIC decode, resize, compress, GPS EXIF |
+| `worker.js` | JPEG encoding, off the main thread |
+| `app.js` | UI and state |
+| `coords.json` | 1,150 societies and their coordinates |
+
+Each photo goes through one pipeline: decode → resize if over 2560 px on the
+long edge → encode at the best quality that fits 2.5 MB → write GPS EXIF → zip.
+
+A few details worth knowing:
+
+- **Formats are detected from magic bytes**, not the file extension, because iOS
+  often reports a HEIC's MIME type as an empty string.
+- **JPEGs already under both caps pass through untouched** — pixels and all other
+  metadata preserved, with only GPS tags added.
+- **Encoding runs in a Worker pool** sized to the device. It's the whole cost of
+  a photo (~500 ms for 12 MP on a phone), so moving it off the main thread keeps
+  the page responsive; there's an inline fallback where Workers or
+  `OffscreenCanvas` aren't available.
+- **The HEIC decoder is loaded lazily**, only when you actually pick a HEIC, so
+  JPEG-only batches don't download 1.3 MB for nothing.
+
+Tags written: `GPSLatitude`, `GPSLatitudeRef`, `GPSLongitude`, `GPSLongitudeRef`,
+`GPSMapDatum` (WGS-84), `GPSVersionID`.
+
+To change the limits, edit `MAX_EDGE` and `MAX_BYTES` at the top of `image.js`.
 
 ## Verify a result
 
@@ -95,5 +108,24 @@ To change the caps, edit `MAX_EDGE` and `MAX_BYTES` at the top of
 exiftool -GPSLatitude -GPSLongitude -GPSPosition photo.jpg
 ```
 
-Or drop a tagged photo into Apple Photos / Google Photos and check that it
-appears on the map at the right society.
+Or drop a tagged photo into Apple Photos or Google Photos and check it appears
+on the map at the right society.
+
+## Notes
+
+- Every photo in a batch gets the same coordinates — the society's centre point,
+  not the precise spot each photo was taken.
+- Transparent PNG areas are flattened onto white, since JPEG has no alpha.
+- A converted HEIC or PNG has no original EXIF to preserve, so its output
+  carries the GPS tags alone.
+- If one photo fails, it's skipped and named in a warning; the rest still
+  download.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+---
+
+Not affiliated with or endorsed by 99acres. It is simply the site whose photo
+requirement this was built for.
