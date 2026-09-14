@@ -41,8 +41,11 @@ internet after the page loads and it still works.
 1. **Add your photos** — drag them in, or tap *browse your files* to pick them
    from your phone's gallery. Picking again adds to the list instead of starting
    over, and the same photo twice is ignored.
-2. **Find the society** — type a few letters and pick it from the list. The
-   coordinates shown are the ones written into every photo in the batch.
+2. **Set the location** — type a few letters of the society name and pick it
+   from the list. Or switch to **Enter coordinates** and paste a latitude and
+   longitude, or a Google Maps link, when your society isn't listed or you want
+   a more precise spot than the society centre. Either way, the coordinates
+   shown are what gets written into every photo.
 3. **Download** — you get one ZIP named after the society. Unzip, and upload.
 
 ## Run it yourself
@@ -60,6 +63,26 @@ file directly, because browsers block `fetch` of `coords.json` over `file://`.)
 
 To use it from your phone on the same Wi-Fi, find your machine's address with
 `ipconfig getifaddr en0` and open `http://<that-address>:8080` there.
+
+## Entering coordinates by hand
+
+Step 2 has a second tab that accepts a location directly. It parses the formats
+people actually paste:
+
+| Input | Result |
+|---|---|
+| `28.505615, 77.092740` | what Google Maps copies |
+| `28.505615 77.092740` | whitespace separated |
+| `28.505615°N, 77.092740°E` | degree signs and hemisphere letters |
+| `77.0927 E, 28.5056 N` | letters decide which number is which |
+| `https://…/maps/@28.5056,77.0927,17z` | a shared map link |
+
+Latitude must be within ±90 and longitude within ±180, so a transposed pair is
+rejected rather than silently writing a location in the Arabian Sea. Photos
+tagged this way download as `photos-28.5056N-77.0927E.zip`.
+
+To get the numbers: in Google Maps, right-click the exact spot and click the
+coordinates that appear to copy them.
 
 ## Adding a society
 

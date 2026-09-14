@@ -125,22 +125,42 @@
     <ul id="grid" class="grid"></ul>
   </section>
 
-  <!-- STEP 2 : society -->
+  <!-- STEP 2 : location -->
   <section class="step" aria-labelledby="s2">
-    <h2 id="s2"><span class="num">2</span> Choose society</h2>
+    <h2 id="s2"><span class="num">2</span> Set the location</h2>
 
-    <div class="combo">
-      <label for="soc" class="sr-only">Search for a society by name</label>
-      <input id="soc" type="text" role="combobox" autocomplete="off"
-             aria-expanded="false" aria-controls="socList" aria-autocomplete="list"
-             placeholder="Start typing a society name&hellip;">
-      <button type="button" id="socClear" class="in-clear" hidden aria-label="Clear society">&times;</button>
-      <ul id="socList" class="combo-list" role="listbox" aria-label="Societies" hidden></ul>
+    <div class="tabs" role="tablist" aria-label="How to set the location">
+      <button type="button" class="tab" id="tabSoc" role="tab"
+              aria-selected="true" aria-controls="panelSoc">Search society</button>
+      <button type="button" class="tab" id="tabMan" role="tab"
+              aria-selected="false" aria-controls="panelMan" tabindex="-1">Enter coordinates</button>
     </div>
-    <p id="socNote" class="note" role="status" aria-live="polite">Loading societies&hellip;</p>
+
+    <div id="panelSoc" role="tabpanel" aria-labelledby="tabSoc">
+      <div class="combo">
+        <label for="soc" class="sr-only">Search for a society by name</label>
+        <input id="soc" type="text" role="combobox" autocomplete="off"
+               aria-expanded="false" aria-controls="socList" aria-autocomplete="list"
+               placeholder="Start typing a society name&hellip;">
+        <button type="button" id="socClear" class="in-clear" hidden aria-label="Clear society">&times;</button>
+        <ul id="socList" class="combo-list" role="listbox" aria-label="Societies" hidden></ul>
+      </div>
+      <p id="socNote" class="note" role="status" aria-live="polite">Loading societies&hellip;</p>
+    </div>
+
+    <div id="panelMan" role="tabpanel" aria-labelledby="tabMan" hidden>
+      <label for="man" class="field-label">Paste coordinates, or a Google Maps link</label>
+      <input id="man" type="text" inputmode="decimal" autocomplete="off"
+             placeholder="28.505615, 77.092740">
+      <p class="hint">In Google Maps, right-click the exact spot and click the
+        numbers to copy them.</p>
+      <p id="manNote" class="note" role="status" aria-live="polite"></p>
+    </div>
+
     <div id="picked" class="picked" hidden>
       <span class="picked-name" id="pickedName"></span>
       <span class="picked-coords" id="pickedCoords"></span>
+      <button type="button" id="refine" class="refine">Not precise enough?</button>
     </div>
   </section>
 
@@ -178,9 +198,11 @@
       many as you like &mdash; picking again adds to the list instead of starting
       over, and the same photo twice is ignored. Tap the &times; on any photo to
       drop it.</li>
-    <li><strong>Find the society.</strong> Type a few letters of the name and pick
-      it from the list. The coordinates shown underneath are the ones that go into
-      every photo in the batch.</li>
+    <li><strong>Set the location.</strong> Type a few letters of the society name
+      and pick it from the list. Or switch to <em>Enter coordinates</em> and paste a
+      latitude and longitude &mdash; or a Google Maps link &mdash; if your society
+      isn&rsquo;t listed, or you want a more precise spot. Either way, the
+      coordinates shown are what goes into every photo in the batch.</li>
     <li><strong>Download.</strong> You get a single ZIP named after the society.
       Unzip it, and upload those photos to your listing.</li>
   </ol>
@@ -216,9 +238,20 @@
       <a href="https://github.com/saranshkhera-openhouse/geo-dude/issues">open an
       issue</a> and it can be added.</dd>
 
+    <dt>Can I set the location myself?</dt>
+    <dd>Yes. Switch step&nbsp;2 to <em>Enter coordinates</em> and paste a latitude and
+      longitude, or a Google Maps link. Use it when your society isn&rsquo;t in the
+      list, or when you want a more precise spot than the society centre &mdash; a
+      particular tower or block, say. If a society is already selected, the
+      <em>Not precise enough?</em> link carries its coordinates across so you can
+      adjust them instead of typing from scratch.
+      <br>To get the numbers: in Google Maps, right-click the exact spot and click
+      the coordinates that appear to copy them.</dd>
+
     <dt>Is the location exact?</dt>
-    <dd>Every photo in a batch gets the same coordinates &mdash; the centre point of
-      the society, not the precise spot each photo was taken.</dd>
+    <dd>When you pick from the list, every photo in the batch gets the society&rsquo;s
+      centre point, not the precise spot each photo was taken. Enter coordinates
+      yourself if you need something more exact.</dd>
   </dl>
 </section>
 </div><!-- /sidecol -->

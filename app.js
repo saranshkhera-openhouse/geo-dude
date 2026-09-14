@@ -14,6 +14,8 @@ const nextFrame = () => new Promise((r) => requestAnimationFrame(() => setTimeou
 
 const photos = [];   // { key, file, format, thumb, note }
 let societies = [];
+/* The chosen location, from either tab: { name, lat, lng, manual }.
+   `name` is the society name, or null when coordinates were typed in. */
 let society = null;
 let busy = false;
 
@@ -220,24 +222,30 @@ function highlight(next) {
 }
 
 function choose(i) {
-  society = matches[i];
-  socInput.value = society.society_name;
+  const s = matches[i];
+  setSelection({ name: s.society_name, lat: +s.latitude, lng: +s.longitude, manual: false });
+  socInput.value = s.society_name;
   socClear.hidden = false;
-  $('pickedName').textContent = society.society_name;
-  $('pickedCoords').textContent =
-    `${(+society.latitude).toFixed(6)}, ${(+society.longitude).toFixed(6)}`;
-  $('picked').hidden = false;
   setNote($('socNote'), '');
   closeList();
+}
+
+/* The single place either tab records its result. */
+function setSelection(sel) {
+  society = sel;
+  if (sel) {
+    $('pickedName').textContent = sel.name || 'Custom location';
+    $('pickedCoords').textContent = `${sel.lat.toFixed(6)}, ${sel.lng.toFixed(6)}`;
+    $('refine').hidden = sel.manual;
+  }
+  $('picked').hidden = !sel;
   refreshGo();
 }
 
 socInput.addEventListener('input', () => {
-  society = null;
-  $('picked').hidden = true;
+  setSelection(null);
   socClear.hidden = socInput.value === '';
   openList(socInput.value);
-  refreshGo();
 });
 socInput.addEventListener('focus', () => { if (!society) openList(socInput.value); });
 socInput.addEventListener('blur', () => setTimeout(closeList, 120));
@@ -255,8 +263,76 @@ socInput.addEventListener('keydown', (e) => {
   }
 });
 socClear.addEventListener('click', () => {
-  society = null; socInput.value = ''; socClear.hidden = true;
-  $('picked').hidden = true; closeList(); socInput.focus(); refreshGo();
+  socInput.value = ''; socClear.hidden = true;
+  setSelection(null); closeList(); socInput.focus();
+});
+
+/* ---------- step 2b : manual coordinates -------------------------------- */
+
+const tabSoc = $('tabSoc'), tabMan = $('tabMan');
+const panelSoc = $('panelSoc'), panelMan = $('panelMan');
+const manInput = $('man');
+
+/* Switching tabs clears the other tab's choice, so what is shown on screen is
+   always what will be written into the photos. */
+function showTab(which, focus) {
+  const manual = which === 'man';
+  tabMan.setAttribute('aria-selected', String(manual));
+  tabSoc.setAttribute('aria-selected', String(!manual));
+  tabMan.tabIndex = manual ? 0 : -1;
+  tabSoc.tabIndex = manual ? -1 : 0;
+  panelMan.hidden = !manual;
+  panelSoc.hidden = manual;
+  setSelection(null);
+  if (manual) {
+    setNote($('socNote'), societies.length ? `${societies.length} societies loaded.` : '');
+    readManual();
+  } else {
+    setNote($('manNote'), '');
+  }
+  if (focus) (manual ? manInput : socInput).focus();
+}
+
+tabSoc.addEventListener('click', () => showTab('soc', true));
+tabMan.addEventListener('click', () => showTab('man', true));
+[tabSoc, tabMan].forEach((t) => t.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    e.preventDefault();
+    showTab(t === tabSoc ? 'man' : 'soc', true);
+  }
+}));
+
+function readManual() {
+  const raw = manInput.value.trim();
+  if (!raw) {
+    setSelection(null);
+    setNote($('manNote'), '');
+    return;
+  }
+  const r = IMG.parseLatLng(raw);
+  if (r.error) {
+    setSelection(null);
+    setNote($('manNote'), r.error === 'empty' ? '' : r.error, 'warn');
+    return;
+  }
+  setSelection({ name: null, lat: r.lat, lng: r.lng, manual: true });
+  // The green confirmation panel already echoes the parsed pair, so saying it
+  // again here would be the same sentence twice.
+  setNote($('manNote'), '');
+}
+
+manInput.addEventListener('input', readManual);
+
+/* From a picked society, jump to the coordinate box pre-filled with its
+   location, so a nudge is an edit rather than a retype. */
+$('refine').addEventListener('click', () => {
+  const from = society;
+  showTab('man', true);
+  if (from) {
+    manInput.value = `${from.lat.toFixed(6)}, ${from.lng.toFixed(6)}`;
+    readManual();
+    manInput.select();
+  }
 });
 
 /* ---------- step 3 : tag & zip ------------------------------------------- */
@@ -282,13 +358,15 @@ function refreshGo(keepNote) {
   if (keepNote) return;
   if (ready) {
     setNote($('goNote'),
-      `Ready: ${photos.length} photo${photos.length === 1 ? '' : 's'} → ${society.society_name}.`);
+      `Ready: ${photos.length} photo${photos.length === 1 ? '' : 's'} → ${locationLabel()}.`);
   } else if (!photos.length && !society) {
     setNote($('goNote'), 'Pick at least one photo and a society first.');
   } else if (!photos.length) {
     setNote($('goNote'), 'Now choose at least one photo.');
   } else {
-    setNote($('goNote'), 'Now choose a society.');
+    setNote($('goNote'), panelMan && !panelMan.hidden
+      ? 'Now enter the coordinates.'
+      : 'Now choose a society.');
   }
 }
 
@@ -300,7 +378,7 @@ go.addEventListener('click', async () => {
   $('fails').textContent = '';
   photos.forEach((p) => { p.note = null; });
 
-  const lat = +society.latitude, lng = +society.longitude;
+  const lat = society.lat, lng = society.lng;
   const zip = new JSZip();
   const used = new Map();
   const failed = [];
@@ -375,7 +453,7 @@ go.addEventListener('click', async () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${safeName(society.society_name)}.zip`;
+    a.download = `${zipName()}.zip`;
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 60000);
 
@@ -402,3 +480,17 @@ go.addEventListener('click', async () => {
 });
 
 const safeName = (s) => s.replace(/[\/\\?%*:|"<>]/g, '-').trim() || 'photos';
+
+/* What to call the selection in the UI, and the ZIP. A typed-in location has no
+   name, so the coordinates stand in for one. */
+const locationLabel = () => society
+  ? (society.name || `${society.lat.toFixed(5)}, ${society.lng.toFixed(5)}`)
+  : '';
+/* Hemisphere letters instead of signs, so a negative value does not produce
+   "photos--33.8688-151.2093". */
+const zipName = () => {
+  if (society.name) return safeName(society.name);
+  const { lat, lng } = society;
+  return `photos-${Math.abs(lat).toFixed(4)}${lat < 0 ? 'S' : 'N'}` +
+         `-${Math.abs(lng).toFixed(4)}${lng < 0 ? 'W' : 'E'}`;
+};

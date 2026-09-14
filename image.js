@@ -7,6 +7,66 @@ const MAX_BYTES = 2.5 * 1024 * 1024; // ~2.5 MB per photo
 const QUALITY_LADDER = [0.92, 0.85, 0.78, 0.70, 0.62, 0.54];
 const HEIC_CDN = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
 
+/* ---------- coordinate parsing ------------------------------------------- */
+
+/* Parse whatever someone pastes into a { lat, lng } pair, or return
+   { error } explaining what was wrong. Accepts:
+     28.505615, 77.092740        the Google Maps "copy coordinates" format
+     28.505615 77.09274          whitespace separated
+     28.505615°N, 77.092740°E    with degree signs and hemisphere letters
+     https://maps.google.com/…@28.5056,77.0927,17z      a shared map link
+     https://…?q=28.5056,77.0927
+   Rejects anything out of range, so a transposed pair (77, 28 in India)
+   is caught rather than silently writing a location in the Arabian Sea. */
+function parseLatLng(raw) {
+  const text = String(raw || '').trim();
+  if (!text) return { error: 'empty' };
+
+  let body = text;
+
+  // A pasted map URL: pull the coordinate pair out of @lat,lng or q=lat,lng.
+  const at = text.match(/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/);
+  const q  = text.match(/[?&](?:q|ll|center|destination)=(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+  if (at) body = `${at[1]},${at[2]}`;
+  else if (q) body = `${q[1]},${q[2]}`;
+  else if (/^https?:\/\//i.test(text)) {
+    return { error: "that link doesn't contain coordinates — open the place in " +
+                    'Google Maps, right-click the exact spot, and copy the numbers' };
+  }
+
+  // Hemisphere letters, if present, decide the sign.
+  const letters = body.toUpperCase().match(/[NSEW]/g) || [];
+  const nums = body.replace(/[^\d.\-+\s,]/g, ' ')
+                   .split(/[\s,]+/)
+                   .filter((t) => t !== '' && t !== '-' && t !== '+')
+                   .map(Number);
+
+  if (nums.length < 2 || nums.some((n) => !Number.isFinite(n))) {
+    return { error: 'enter two numbers, like 28.505615, 77.092740' };
+  }
+  if (nums.length > 2) {
+    return { error: 'that looks like more than one coordinate pair' };
+  }
+
+  let [lat, lng] = nums;
+  if (letters.length === 2) {
+    // "77.09E, 28.50N" — letters tell us which number is which.
+    if (letters[0] === 'E' || letters[0] === 'W') [lat, lng] = [lng, lat];
+    const latLetter = letters.find((c) => c === 'N' || c === 'S');
+    const lngLetter = letters.find((c) => c === 'E' || c === 'W');
+    lat = Math.abs(lat) * (latLetter === 'S' ? -1 : 1);
+    lng = Math.abs(lng) * (lngLetter === 'W' ? -1 : 1);
+  }
+
+  if (Math.abs(lat) > 90) {
+    return { error: `latitude must be between -90 and 90 (got ${lat})` };
+  }
+  if (Math.abs(lng) > 180) {
+    return { error: `longitude must be between -180 and 180 (got ${lng})` };
+  }
+  return { lat, lng };
+}
+
 /* ---------- GPS / EXIF ---------------------------------------------------- */
 
 /* Decimal degrees -> EXIF rational DMS, e.g. 28.502937 ->
@@ -366,7 +426,7 @@ async function makeThumb(file, format, edge = 220) {
 
 window.GeoImage = {
   sniffFormat, processPhoto, makeThumb, toJpegName,
-  stampGps, toDMS, dataUrlToBytes,
+  stampGps, toDMS, dataUrlToBytes, parseLatLng,
   MAX_EDGE, MAX_BYTES, POOL_SIZE,
   usingWorkers: () => !!pool && !poolBroken,
 };

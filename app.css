@@ -398,3 +398,44 @@ header{
   margin:16px 0 0; padding-top:14px; border-top:1px solid var(--line);
   font-size:12.5px; color:var(--ink-soft);
 }
+
+/* ---- step 2 tabs: search a society, or type coordinates ---- */
+.tabs{
+  display:flex; gap:2px; margin-bottom:14px;
+  padding:2px; border-radius:8px; background:var(--line);
+}
+.tab{
+  flex:1; padding:7px 10px; font:inherit; font-size:13px; font-weight:550;
+  color:var(--ink-soft); background:none; border:none; border-radius:6px;
+  cursor:pointer; transition:background .15s, color .15s;
+}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{
+  background:var(--card); color:var(--ink);
+  box-shadow:0 1px 3px rgba(0,0,0,.07);
+}
+
+.field-label{
+  display:block; margin:0 0 6px;
+  font-size:13px; font-weight:550; color:var(--ink);
+}
+#man{
+  width:100%; padding:11px 12px; font:inherit;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:14px;
+  color:var(--ink); background:var(--bg);
+  border:1px solid var(--line-hard); border-radius:8px;
+}
+#man:focus{outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent)}
+.hint{margin:7px 0 0; font-size:12.5px; color:var(--ink-soft)}
+
+/* "Not precise enough?" — sits inside the confirmation, offering an escape
+   hatch exactly where someone would doubt the coordinates. */
+.refine{
+  margin-left:auto; padding:0; font:inherit; font-size:12.5px;
+  color:var(--accent); background:none; border:none; cursor:pointer;
+  text-decoration:underline; text-underline-offset:2px; opacity:.85;
+}
+.refine:hover{opacity:1}
+@media (max-width:420px){
+  .refine{margin-left:0; flex-basis:100%}
+}
